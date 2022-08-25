@@ -1,0 +1,211 @@
+Ставить только на резерв. перед этим переименовать кофинги
+wget http://smstools3.kekekasvi.com/packages/smstools3-3.1.21.tar.gz
+
+### Может обновить и лайм!!!!!!!!! ### apt-get install -y make gcc
+apt-get install recode
+make -s install
+тюним конфиг
+/etc/init.d/sms3 start
+/etc/init.d/sms3 restart
+
+создать папки
+mkdir /var/spool/sms
+mkdir /var/spool/sms/checked
+mkdir /var/spool/sms/failed
+mkdir /var/spool/sms/incoming
+mkdir /var/spool/sms/outgoing
+mkdir /var/spool/sms/sent
+
+dmesg  - покажет устройство
+ls -al /dev/ttyUSB2
+
+
+cat /etc/smsd.conf
+devices = GSM1,GSM2
+logfile = /var/log/smsd.log
+outgoing = /var/spool/sms/outgoing
+checked = /var/spool/sms/checked
+incoming = /var/spool/sms/incoming
+failed = /var/spool/sms/failed
+sent = /var/spool/sms/sent
+loglevel = 7
+checkhandler = /opt/limetaxi/samael_scripts/recive_sms.sh
+eventhandler = /opt/limetaxi/samael_scripts/recive_sms.sh
+
+[GSM1]
+device = /dev/ttyUSB0
+baudrate = 115200
+#check_memory_method = 31
+#rtscts = no
+#regular_run_cmd = AT+CUSD=1,"AA180C3602",15;
+#regular_run_interval = 86400O
+#regular_run_logfile = /var/log/sms/regular_run.log
+#init = AT+CPMS="ME","ME","ME"
+#init2 = AT^BOOT=0,0
+#init2 = AT+CNMI=1,1,0,2
+#init = at+cpms="sm","sm",""
+incoming = high
+#checkhandler = /usr/local/sbin/smsrol
+#eventhandler = /usr/local/sbin/smsrol
+
+[GSM2]
+device = /dev/ttyUSB2
+baudrate = 115200
+#check_memory_method = 31
+#rtscts = no
+#regular_run_cmd = AT+CUSD=1,"AA180C3602",15;
+#regular_run_interval = 86400O
+#regular_run_logfile = /var/log/sms/regular_run.log
+#init = AT+CPMS="ME","ME","ME"
+#init2 = AT^BOOT=0,0
+#init2 = AT+CNMI=1,1,0,2
+#init = at+cpms="sm","sm",""
+incoming = high
+#checkhandler = /usr/local/sbin/smsrol
+#eventhandler = /usr/local/sbin/smsrol
+
+/etc/init.d/smstools restart
+
+ cat /home/lime/receive_sms.sh
+#!/bin/bash
+
+# Проверка кодировки тела входящего SMS-сообщения.
+        # Если кодировка UCS2, то перекодируем в UTF-8
+        if grep "Alphabet: UCS2" $2 > /dev/null; then
+                FROM=$(head -5 "$2" | grep -e '^From\:'|cut -d' ' -f2)
+
+                BODY=$(sed -e '1,/^$/ d' $2 | recode UCS-2..utf8)
+                MODEM=$(head -7 "$2" | grep -e '^Modem\:'|cut -d' ' -f2)
+        else
+                FROM=$(head -5 "$2" | grep -e '^From\:'|cut -d' ' -f2)
+                BODY=$(sed -e '1,/^$/ d' $2)
+                MODEM=$(head -7 "$2" | grep -e '^Modem\:'|cut -d' ' -f2)
+        fi
+
+ echo "INSERT INTO public.a_samael_received_sms(num,body,modem) VALUES ('$FROM','$BODY','$MODEM')" | psql -At -U postgres taxi2
+echo $FROM
+echo $BODY
+echo $MODEM
+
+CREATE TABLE public.a_samael_received_sms (
+  idx BIGSERIAL,
+  num VARCHAR,
+  body VARCHAR,
+  amount DOUBLE PRECISION,
+  poz INTEGER,
+  dt TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT now(),
+  modem VARCHAR,
+  CONSTRAINT received_sms_wame_pkey PRIMARY KEY(idx)
+) 
+WITH (oids = false);
+
+COMMENT ON TABLE public.a_samael_received_sms
+IS 'Samael Входящие СМС';
+
+COMMENT ON COLUMN public.a_samael_received_sms.idx
+IS 'IDX';
+
+COMMENT ON COLUMN public.a_samael_received_sms.num
+IS 'От кого';
+
+COMMENT ON COLUMN public.a_samael_received_sms.body
+IS 'Текст';
+
+COMMENT ON COLUMN public.a_samael_received_sms.amount
+IS 'Сумма';
+
+COMMENT ON COLUMN public.a_samael_received_sms.poz
+IS 'Позывной';
+
+COMMENT ON COLUMN public.a_samael_received_sms.dt
+IS 'Дата';
+
+COMMENT ON COLUMN public.a_samael_received_sms.modem
+IS 'Модем';
+
+
+  
+-- //////////////////////////////////
+ 
+ CREATE OR REPLACE FUNCTION public.tg_a_samael_received_sms_af (
+)
+RETURNS trigger AS
+$body$
+DECLARE
+
+BEGIN
+/*
+IF(new.amount>0 and new.poz>0 and new.modem='GSM1') then
+    IF(exists(select a.idx from auto a join auto_session ass on a.idx = ass.autoid where a.pozivnoy=new.poz)) then
+    	INSERT INTO public.doc_autopayment (amt, paysourceid,autoid,driverid) VALUES (new.amount,11,(select a.idx from auto a join auto_session ass on a.idx = ass.autoid where a.pozivnoy=new.poz),(select ass.driverid from auto a join auto_session ass on a.idx = ass.autoid where a.pozivnoy=new.poz));
+    end if;
+
+ELSIF(new.amount>0 and new.poz>0 and new.modem='GSM2') then
+    IF(exists(select a.idx from auto a join auto_session ass on a.idx = ass.autoid where a.pozivnoy=new.poz)) then
+    	INSERT INTO public.doc_autopayment (amt, paysourceid,autoid,driverid) VALUES (new.amount,12,(select a.idx from auto a join auto_session ass on a.idx = ass.autoid where a.pozivnoy=new.poz),(select ass.driverid from auto a join auto_session ass on a.idx = ass.autoid where a.pozivnoy=new.poz));
+    end if;
+end if;
+*/
+
+ INSERT INTO xlog_claim (clientphone,authorid,message,category) values ('900','-2',NEW.body, 'СМС');
+RETURN NEW;
+END;
+$body$
+LANGUAGE 'plpgsql'
+VOLATILE
+CALLED ON NULL INPUT
+SECURITY INVOKER
+COST 100;
+ 
+ CREATE TRIGGER tg_a_samael_received_sms_af
+  BEFORE INSERT 
+  ON public.a_samael_received_sms
+  
+FOR EACH ROW 
+  EXECUTE PROCEDURE public.tg_a_samael_received_sms_af();
+ 
+CREATE OR REPLACE FUNCTION public.tg_a_samael_received_sms_on (
+)
+RETURNS trigger AS
+$body$
+DECLARE
+pozivnoy integer;
+BEGIN
+/*
+IF((new.body like 'Перевод%Сообщение%' or new.body like '%зачисление%Сообщение%' or new.body like '%Сбербанк Онлайн.%Сообщение%' or new.body like '%Зачисление%Сообщение%') and new.num like '900') then
+	if(new.body like 'Перевод%Сообщение%')then
+    	new.amount=replace(array_to_string((regexp_matches(new.body,'Перевод (.*?)р')),',', '*'),' ','');
+    elsif(new.body like '%зачисление%Сообщение%') then
+    	new.amount=replace(array_to_string((regexp_matches(new.body,'зачисление (.*?)р')),',', '*'),' ','');
+	elsif(new.body like '%Зачисление%Сообщение%') then  	
+        new.amount=replace(array_to_string((regexp_matches(new.body,'Зачисление (.*?)руб.')),',', '*'),' ','');       
+    elsif(new.body like '%Сбербанк Онлайн%Сообщение%') then
+    	new.amount=replace(array_to_string((regexp_matches(new.body,'Вам (.*?) RUB')),',', '*'),' ','');
+    end if;
+
+
+pozivnoy=array_to_string((regexp_matches(array_to_string(regexp_matches(new.body,'Сообщение: "(.*?)"'), ',', '*'),'\d+')),',', '*');
+
+    if(pozivnoy>0) then
+ 		new.poz=pozivnoy;
+	end if;
+end if;
+*/
+
+RETURN NEW;
+END;
+$body$
+LANGUAGE 'plpgsql'
+VOLATILE
+CALLED ON NULL INPUT
+SECURITY INVOKER
+COST 100; 
+ 
+CREATE TRIGGER tg_a_samael_received_sms_on
+  BEFORE INSERT 
+  ON public.a_samael_received_sms
+  
+FOR EACH ROW 
+  EXECUTE PROCEDURE public.tg_a_samael_received_sms_on(); 
+ 
+ 

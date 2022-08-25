@@ -1,0 +1,17 @@
+Задание 1:
+ - http://127.0.0.1:8080/getFreePhonesByCountry
+ - http://127.0.0.1:8080/swagger-ui/index.html#/free-country-controller/getFreeCountry
+Задание 2:
+ - http://127.0.0.1:8080/priceByCountry
+      * Для парсинга использую selenium,  chromedriver.exe в корне проекта. Запускается в "скрытом режиме"
+      * Скачать версию можно тут: https://chromedriver.storage.googleapis.com/index.html
+      * Версия должна совпадать с установленным Chrome
+      * http://127.0.0.1:8080/priceByCountry?update=true - для обновления устаревших данных
+      * Можно доработать, и отправлять данные с датой последнего обновления
+      * Запускать по крону обновление
+
+Задание 3:
+ - ru/itsrv23/keepcode_test/task3/TaskThree.java
+Задание 4:
+ - ru/itsrv23/keepcode_test/task4/sms_income
+ - делал прием платежей от водителей по смс ке с номера 900 о поступлении денег
