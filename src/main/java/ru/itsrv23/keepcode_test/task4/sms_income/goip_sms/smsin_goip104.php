@@ -3,7 +3,7 @@
     apt-get install php5-pgsql
 */
 
-$dbconn = pg_connect("host=localhost dbname=taxi2 user=postgres password=GravicapaTolkoZaKace")
+$dbconn = pg_connect("host=localhost dbname=taxi2 user=postgres password=********")
     or die('Не удалось соединиться: ' . pg_last_error());
 
 
